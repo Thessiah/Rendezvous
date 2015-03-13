@@ -20,7 +20,7 @@ Email: ericyang94@ucla.edu
 # Partner 2 (if you're working in a team)
 Name: Kevin Zuo
 Student ID: 104201160
-Email: 
+Email: kevinzuo@ucla.edu
 
 # EXERCISE 1: What method you used to make your peer download and upload
 #    files in parallel?  (~1-3 sentences)
@@ -55,16 +55,12 @@ directories.
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
 
-In evil mode, we impemented an attack that sends extremely large files that could eat up
-a downloading peer's disk space. This is an attack because it can trick peers into
-downloading useless data instead of what they requested.
-
-Another attack we added relates to the buffer overflow fix we addressed earlier. We use
+The first attack we added relates to the buffer overflow fix we addressed earlier. We use
 a long file name to overflow the buffer of the peer. This is an attack because it will
 crash the other peer who receives the long file name.
 
-Lastly, we implemented an attack that could create an infinite number of processes for 
-other peers. We repeatedly request to download from others and eventually prevent the
+The other attack we implemented an attack that could create an infinite number of processes 
+for other peers. We repeatedly request to download from others and eventually prevent the
 peers from doing anything. This is an attack that tricks peers into believing that we
 are requesting files only to become frozen or crash.
 
