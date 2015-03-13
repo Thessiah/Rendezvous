@@ -26,6 +26,11 @@
 
 int evil_mode = 0;			// nonzero iff this peer should behave badly
 
+int encrypted_mode = 0;
+
+char password[] = "default";
+
+int encrypt(char* filename);
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
 #define MAXUPLOADSIZE 200000000 //limit maximum file size to 200 MB
@@ -38,6 +43,7 @@ static int listen_port;
 
 #define TASKBUFSIZ	4096	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
+#define PASSWORDSIZE 100 
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -64,7 +70,7 @@ typedef struct task {
 	unsigned tail;
 	size_t total_written;	// Total number of bytes written
 				// by write_to_taskbuf
-
+	char password[PASSWORDSIZE];
 	char filename[FILENAMESIZ];	// Requested filename
 	char disk_filename[FILENAMESIZ]; // Local filename (TASK_DOWNLOAD)
 
@@ -510,6 +516,8 @@ exit:
 //	until a download is successful.
 static void task_download(task_t *t, task_t *tracker_task)
 {
+	int correct_password = 0;
+	char a[PASSWORDSIZE];
 	int i, ret = -1;
 	assert((!t || t->type == TASK_DOWNLOAD)
 		&& tracker_task->type == TASK_TRACKER);
@@ -536,6 +544,19 @@ static void task_download(task_t *t, task_t *tracker_task)
 	}
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
+	if(encrypted_mode!=0)
+	{
+		while(strcmp(t->password,a)!=0) {
+			printf("Enter password: ");
+			scanf("%s", a);	
+			if(strcmp(password,a)!=0)
+			{
+				printf("Wrong password!!!\n");
+			}
+		}
+		printf("Correct Password!!!\n");
+		correct_password = 1;
+	}
 
 	// Open disk file for the result.
 	// If the filename already exists, save the file in a name like
@@ -594,6 +615,16 @@ static void task_download(task_t *t, task_t *tracker_task)
 			t->disk_filename, (unsigned long)t->total_written);
 		// Inform the tracker that we now have the file,
 		// and can serve it to others!  (But ignore tracker errors.)
+
+		if(correct_password == 1)
+		  {	
+			if(!encrypt(t->filename))
+			{
+			  error("Cannot decrypt file.\n");
+			  goto try_again;
+			}
+		}	
+
 		if (strcmp(t->filename, t->disk_filename) == 0) {
 			osp2p_writef(tracker_task->peer_fd, "HAVE %s\n",
 				t->filename);
@@ -681,6 +712,17 @@ static void task_upload(task_t *t)
 			goto exit;
 		}
 	}
+
+	if(encrypted_mode != 0)
+	{
+	        
+		 if(!encrypt(t->filename))
+		  {
+			error("Cannot encrypt file.\n");
+			goto exit;
+		  }
+	}
+
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
@@ -919,11 +961,7 @@ argprocess:
 	for (; argc > 1; argc--, argv++)
 	if ((t = start_download(tracker_task, argv[1])))
 	{
-		pid_t pid = fork();
-		if (pid == 0) {
-			task_download(t, tracker_task);
-			exit(0);
-		}
+		task_download(t,tracker_task);
 	}
 	int status;
 	switch (evil_mode)
@@ -973,3 +1011,36 @@ argprocess:
 
 	return 0;
 }
+
+int encrypt(char* filename)
+{ 
+  FILE *orig;
+  FILE *crypt;
+
+  int byte;
+   
+  if((orig = fopen(filename, "r+")) == NULL)
+    { 
+      error("* Cannot open file!");
+      return 0;
+    }
+
+ if((crypt = fopen("encrypt_temp", "a")) == NULL)
+ {
+ 	error("* Cannot open crypted file!");
+ }
+
+  while ((byte = fgetc(orig)) != EOF) 
+    {
+      byte = byte^999;
+      if (fputc(byte, crypt) == EOF)
+		{
+	  		error("* Encryption error\n");
+	  		return 0;
+		}
+    }
+
+  remove(filename);
+  rename("encrypt_temp",filename);
+  return 1;
+} 
